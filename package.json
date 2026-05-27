@@ -1,0 +1,14 @@
+{
+  "name": "cricfit-arena-backend",
+  "version": "1.0.0",
+  "description": "Backend Express & WebSocket server for CricFit Arena",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "dev": "node --env-file=.env server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.16.0"
+  }
+}

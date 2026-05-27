@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CricFit Arena | Stadium Energy Meets Fitness Goals</title>
+  <meta name="description" content="CricFit Arena combines live IPL cricket fan engagement with AI-powered fitness tracking. Complete match-triggered challenges, earn XP, and compete with your squad." />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- MediaPipe Pose Requirements -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <!-- Confetti for rewards -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/enhancements.css" />
+</head>
+<body>
+
+<!-- API Key Modal -->
+<div id="api-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <h2><i class="fas fa-key"></i> Gemini API Key</h2>
+    <p>Enter your Gemini API key to unlock AI polls, AI Coach, and personalized challenges.</p>
+    <input type="password" id="api-key-input" placeholder="AIza..." />
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="saveApiKey()">Save & Activate</button>
+      <button class="btn-ghost" onclick="closeApiModal()">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- Challenge Pop-up Notification -->
+<div id="challenge-popup" class="challenge-popup" style="display:none">
+  <div class="popup-inner">
+    <div class="popup-icon" id="popup-icon">🏏</div>
+    <div class="popup-content">
+      <div class="popup-title" id="popup-title">SIX ALERT!</div>
+      <div class="popup-desc" id="popup-desc">Drop 15 pushups to earn 150 XP!</div>
+    </div>
+    <div class="popup-actions">
+      <button class="btn-primary sm" onclick="acceptChallenge()">Accept</button>
+      <button class="btn-ghost sm" onclick="dismissChallenge()">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- Live Match Bar -->
+<div id="live-match-bar">
+  <div class="match-bar-inner">
+    <div class="live-badge"><span class="pulse-dot"></span>LIVE</div>
+    <div class="match-teams">
+      <span class="team-tag mi-tag">MI</span>
+      <div class="score-block">
+        <span id="bar-score-mi">186/4 (18.3)</span>
+        <span class="bar-vs">vs</span>
+        <span id="bar-score-csk">211/4 (20.0)</span>
+      </div>
+      <span class="team-tag csk-tag">CSK</span>
+    </div>
+    <div class="bar-meta">
+      <span id="bar-status">MI need 26 off 9 balls</span>
+    </div>
+    <div class="bar-actions">
+      <button class="btn-icon-bar" onclick="showApiKeyModal()" title="Set API Key"><i class="fas fa-key"></i></button>
+      <button class="btn-icon-bar" onclick="toggleSidebar()" title="Menu"><i class="fas fa-bars"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- App Container -->
+<div id="app-container">
+
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="logo-wrap">
+      <img src="logo.png" alt="CricFit Arena Logo" class="logo-img" />
+      <div class="logo-text">CricFit<span>Arena</span></div>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item active" data-page="dashboard"    onclick="navigate('dashboard')"><i class="fas fa-gauge-high"></i><span>Dashboard</span></li>
+      <li class="nav-item"        data-page="live-match"  onclick="navigate('live-match')"><i class="fas fa-satellite-dish"></i><span>Live Match</span><em class="nav-live">LIVE</em></li>
+      <li class="nav-item"        data-page="fit-arena"   onclick="navigate('fit-arena')"><i class="fas fa-dumbbell"></i><span>Fit Arena</span></li>
+      <li class="nav-item"        data-page="ai-coach"    onclick="navigate('ai-coach')"><i class="fas fa-robot"></i><span>AI Coach</span></li>
+      <li class="nav-item"        data-page="squad"       onclick="navigate('squad')"><i class="fas fa-users"></i><span>Squad Zone</span></li>
+      <li class="nav-item"        data-page="profile"     onclick="navigate('profile')"><i class="fas fa-user-circle"></i><span>My Profile</span></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="avatar-circle">R</div>
+        <div class="user-meta">
+          <div class="user-name-sm">Rishi</div>
+          <div class="user-level-sm">Level 12 FitFan</div>
+        </div>
+        <div class="xp-pill"><i class="fas fa-fire"></i><span id="total-xp">2,450</span></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main id="main-content">
+
+    <!-- ===== DASHBOARD ===== -->
+    <section id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <h1>Welcome to CricFit Arena 🏏💪</h1>
+          <p>Where stadium energy meets your fitness goals</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-primary" onclick="navigate('fit-arena')"><i class="fas fa-dumbbell"></i> Start Workout</button>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="stat-card" style="--accent:#f97316">
+          <div class="stat-icon"><i class="fas fa-fire"></i></div>
+          <div><div class="stat-val" id="dash-streak">7</div><div class="stat-lbl">Day Streak</div></div>
+        </div>
+        <div class="stat-card" style="--accent:#06b6d4">
+          <div class="stat-icon"><i class="fas fa-check-double"></i></div>
+          <div><div class="stat-val" id="dash-challenges">24</div><div class="stat-lbl">Challenges Done</div></div>
+        </div>
+        <div class="stat-card" style="--accent:#a855f7">
+          <div class="stat-icon"><i class="fas fa-trophy"></i></div>
+          <div><div class="stat-val" id="dash-rank">#4</div><div class="stat-lbl">Squad Rank</div></div>
+        </div>
+        <div class="stat-card" style="--accent:#10b981">
+          <div class="stat-icon"><i class="fas fa-dumbbell"></i></div>
+          <div><div class="stat-val" id="dash-reps">847</div><div class="stat-lbl">Total Reps</div></div>
+        </div>
+        <div class="stat-card" style="--accent:#eab308">
+          <div class="stat-icon"><i class="fas fa-star"></i></div>
+          <div><div class="stat-val" id="dash-xp">2,450</div><div class="stat-lbl">Total XP</div></div>
+        </div>
+      </div>
+
+      <!-- Dashboard Grid -->
+      <div class="dash-grid">
+        <!-- Live Match Mini -->
+        <div class="glass-card span-2">
+          <div class="card-head">
+            <h3><i class="fas fa-satellite-dish"></i> Live Match</h3>
+            <button class="btn-primary sm" onclick="navigate('live-match')">Open Full View</button>
+          </div>
+          <canvas id="mini-stadium-canvas"></canvas>
+          <div class="mini-match-info">
+            <div class="mini-score-row">
+              <span class="team-pill mi">MI <strong id="mini-mi-score">186/4</strong></span>
+              <span class="mini-over-info" id="mini-over">18.3 ov • Need 26 off 9</span>
+              <span class="team-pill csk">CSK <strong>211/4</strong></span>
+            </div>
+            <div id="mini-balls-row" class="balls-display"></div>
+          </div>
+        </div>
+
+        <!-- Active Challenge -->
+        <div class="glass-card challenge-glow">
+          <div class="card-head">
+            <h3><i class="fas fa-person-running"></i> Active Challenge</h3>
+            <span class="countdown-badge" id="dash-timer">02:45</span>
+          </div>
+          <div id="dash-challenge-content">
+            <div class="big-emoji">💪</div>
+            <div class="challenge-name">SIX ALERT! Pushup Blitz</div>
+            <div class="challenge-sub">Rohit hit a SIX! Do 15 pushups → earn 150 XP</div>
+            <div class="rep-progress-wrap">
+              <div class="rep-progress-bar"><div class="rep-progress-fill" id="dash-progress" style="width:40%"></div></div>
+              <span id="dash-rep-label">6 / 15 reps</span>
+            </div>
+            <button class="btn-primary full-w mt-1" onclick="navigate('fit-arena')">Start Now <i class="fas fa-arrow-right"></i></button>
+          </div>
+        </div>
+
+        <!-- AI Poll -->
+        <div class="glass-card">
+          <div class="card-head">
+            <h3><i class="fas fa-robot"></i> Gemini AI Poll</h3>
+            <span class="ai-chip">Gemini</span>
+          </div>
+          <div id="dash-poll-area">
+            <div class="poll-q" id="dash-poll-q">Will MI chase this total?</div>
+            <div class="poll-opts" id="dash-poll-opts"></div>
+            <button class="btn-ghost sm mt-1" onclick="generateDashPoll()"><i class="fas fa-wand-magic-sparkles"></i> New Poll</button>
+          </div>
+        </div>
+
+        <!-- Activity Chart -->
+        <div class="glass-card span-2">
+          <div class="card-head"><h3><i class="fas fa-chart-pie"></i> Weekly Activity</h3></div>
+          <canvas id="activity-chart" height="120"></canvas>
+        </div>
+
+        <!-- Mini Leaderboard -->
+        <div class="glass-card">
+          <div class="card-head">
+            <h3><i class="fas fa-crown"></i> Top FitFans</h3>
+            <button class="btn-ghost sm" onclick="navigate('squad')">Full Board</button>
+          </div>
+          <div id="mini-leaderboard"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== LIVE MATCH ===== -->
+    <section id="page-live-match" class="page">
+      <div class="page-header">
+        <div>
+          <h1><i class="fas fa-satellite-dish"></i> Live Match Hub</h1>
+          <p>MI vs CSK • IPL 2025 • Match 47 • Wankhede Stadium</p>
+        </div>
+      </div>
+      <div class="match-grid">
+        <!-- Scoreboard -->
+        <div class="glass-card span-full scoreboard-card">
+          <div class="scoreboard-row">
+            <div class="team-block mi-block">
+              <div class="team-badge mi-badge">MI</div>
+              <div class="team-score-info">
+                <div class="big-runs" id="mi-score-display">186/4</div>
+                <div class="overs-info">(18.3 overs)</div>
+              </div>
+            </div>
+            <div class="match-center-info">
+              <div class="match-vs">VS</div>
+              <div class="match-target">Target: 212</div>
+              <div class="match-phase-badge" id="match-phase">Chasing</div>
+            </div>
+            <div class="team-block csk-block">
+              <div class="team-badge csk-badge">CSK</div>
+              <div class="team-score-info">
+                <div class="big-runs">211/4</div>
+                <div class="overs-info">(20.0 overs)</div>
+              </div>
+            </div>
+          </div>
+          <div class="batsmen-row">
+            <div class="batsman-chip"><span class="batsman-n">Rohit Sharma★</span><span class="batsman-s">67(42) SR:159</span></div>
+            <div class="partnership-badge">Partnership: 94(58)</div>
+            <div class="batsman-chip"><span class="batsman-n">Suryakumar</span><span class="batsman-s">45(28) SR:160</span></div>
+          </div>
+          <div class="over-display">
+            <span class="over-label">Over 18.3 — 24 runs this over:</span>
+            <div id="live-balls-row" class="balls-display"></div>
+          </div>
+        </div>
+
+        <!-- 3D Stadium -->
+        <div class="glass-card stadium-card">
+          <div class="card-head">
+            <h3><i class="fas fa-vr-cardboard"></i> 3D Stadium View</h3>
+            <div class="stadium-btn-group">
+              <button class="btn-icon-sm" id="toggle-rotate-btn" onclick="stadium3D.toggleRotation()"><i class="fas fa-rotate"></i></button>
+              <button class="btn-icon-sm" onclick="stadium3D.resetCamera()"><i class="fas fa-expand"></i></button>
+            </div>
+          </div>
+          <canvas id="stadium-3d-canvas"></canvas>
+          <div class="stadium-overlay-stats">
+            <div class="ov-stat"><small>Crowd</small><b>68,000</b></div>
+            <div class="ov-stat"><small>Temp</small><b>28°C</b></div>
+            <div class="ov-stat"><small>Venue</small><b>Wankhede</b></div>
+          </div>
+        </div>
+
+        <!-- Commentary -->
+        <div class="glass-card commentary-card">
+          <div class="card-head">
+            <h3><i class="fas fa-microphone"></i> Live Commentary</h3>
+            <span class="live-pill"><span class="pulse-dot"></span>Live</span>
+          </div>
+        </div>
+
+        <!-- Fan Live Chat Room -->
+        <div class="glass-card fan-chat-card">
+          <div class="card-head">
+            <h3><i class="fas fa-comments"></i> Fan Chat Room</h3>
+            <span class="live-pill"><span class="pulse-dot"></span>Active</span>
+          </div>
+          <div id="fan-chat-messages" class="commentary-feed" style="height: 220px; font-size: 0.9rem;">
+            <div class="msg bot-msg" style="max-width:100%">
+              <div class="msg-bubble" style="padding:0.5rem; background:rgba(255,255,255,0.03)">[System] Welcome to CricFit Arena Live Chat! Post scores, cheer, and push your friends to finish challenges.</div>
+            </div>
+          </div>
+          <div class="chat-input-row" style="margin-top:0.75rem">
+            <input type="text" id="fan-chat-input" placeholder="Cheer for your team..." onkeydown="if(event.key==='Enter')sendFanChatMessage()" style="padding:0.5rem" />
+            <button class="btn-primary sm" onclick="sendFanChatMessage()"><i class="fas fa-paper-plane"></i></button>
+          </div>
+        </div>
+
+        <!-- AI Match Polls -->
+        <div class="glass-card">
+          <div class="card-head">
+            <h3><i class="fas fa-robot"></i> Live AI Polls</h3>
+            <span class="ai-chip">Gemini</span>
+          </div>
+          <div id="match-poll-area"></div>
+          <button class="btn-secondary full-w mt-1" onclick="generateMatchPoll()">
+            <i class="fas fa-chart-simple"></i> Generate New Poll
+          </button>
+        </div>
+
+        <!-- Match Challenges -->
+        <div class="glass-card">
+          <div class="card-head">
+            <h3><i class="fas fa-tasks"></i> Match Challenges</h3>
+            <span class="challenges-count" id="challenges-earned">3 earned today</span>
+          </div>
+          <div id="match-challenges-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FIT ARENA ===== -->
+    <section id="page-fit-arena" class="page">
+      <div class="page-header">
+        <div>
+          <h1><i class="fas fa-dumbbell"></i> Fit Arena</h1>
+          <p>AI Pose Tracking • Real-time rep counting • Form correction</p>
+        </div>
+      </div>
+      <div class="fit-grid">
+        <!-- Camera / Tracker -->
+        <div class="glass-card camera-main-card">
+          <div class="card-head">
+            <h3><i class="fas fa-camera"></i> AI Pose Tracker</h3>
+            <select id="exercise-select" onchange="fitTracker.setExercise(this.value)">
+              <option value="pushup">Pushups</option>
+              <option value="squat">Squats</option>
+              <option value="jumping_jack">Jumping Jacks</option>
+              <option value="bicep_curl">Bicep Curls</option>
+            </select>
+          </div>
+          <div class="cam-wrap">
+            <video id="pose-video" playsinline muted></video>
+            <canvas id="pose-canvas"></canvas>
+            <div class="cam-overlay">
+              <div class="rep-display">
+                <div class="rep-num" id="rep-display">0</div>
+                <div class="rep-tag">REPS</div>
+              </div>
+              <div class="form-tag" id="form-tag"><i class="fas fa-circle-check"></i> Get Ready</div>
+              <div class="phase-tag" id="phase-tag">Position yourself</div>
+            </div>
+          </div>
+          <div class="cam-controls">
+            <button class="btn-primary" id="start-cam-btn" onclick="fitTracker.startCamera()"><i class="fas fa-video"></i> Start Camera</button>
+            <button class="btn-secondary" id="stop-cam-btn" onclick="fitTracker.stopCamera()" style="display:none"><i class="fas fa-stop"></i> Stop</button>
+            <button class="btn-accent" onclick="fitTracker.resetReps()"><i class="fas fa-rotate-left"></i> Reset</button>
+          </div>
+          <div class="pose-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#06b6d4;color:#06b6d4"></div>Arms</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#f97316;color:#f97316"></div>Torso</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#10b981;color:#10b981"></div>Legs</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#10b981;color:#10b981"></div><span style="color:#10b981">Green arc</span> = good angle</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#f97316;color:#f97316"></div><span style="color:#f97316">Orange arc</span> = mid range</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ef4444;color:#ef4444"></div><span style="color:#ef4444">Red arc</span> = full flex</div>
+          </div>
+        </div>
+
+        <!-- Current Challenge -->
+        <div class="glass-card challenge-info-card">
+          <div class="card-head">
+            <h3><i class="fas fa-heart-pulse"></i> Match Challenge</h3>
+            <div class="xp-badge-big">+150 XP</div>
+          </div>
+          <div class="fit-challenge-block" id="fit-challenge-block">
+            <div class="challenge-emoji-big">🏏</div>
+            <h4 id="fit-challenge-title">SIX ALERT: Pushup Blitz</h4>
+            <p id="fit-challenge-desc">Rohit hit a SIX! Complete 15 pushups in 3 minutes to earn 150 XP</p>
+            <div class="time-left-wrap">
+              <i class="fas fa-clock"></i><span id="fit-timer">2:45 remaining</span>
+            </div>
+            <div class="progress-section">
+              <div class="progress-bar-lg"><div class="progress-fill-lg" id="fit-progress-fill" style="width:40%"></div></div>
+              <span id="fit-progress-label">6 / 15 reps</span>
+            </div>
+          </div>
+          <!-- Upcoming Challenges -->
+          <div class="upcoming-section">
+            <div class="upcoming-title">Upcoming Triggers</div>
+            <div id="upcoming-challenges"></div>
+          </div>
+        </div>
+
+        <!-- Workout Stats -->
+        <div class="glass-card workout-stats-card">
+          <div class="card-head"><h3><i class="fas fa-chart-bar"></i> Session Stats</h3></div>
+          <div class="session-stats-grid">
+            <div class="session-stat"><div class="ss-val" id="ss-reps">0</div><div class="ss-lbl">Total Reps</div></div>
+            <div class="session-stat"><div class="ss-val" id="ss-sets">0</div><div class="ss-lbl">Sets Done</div></div>
+            <div class="session-stat"><div class="ss-val" id="ss-cal">0</div><div class="ss-lbl">Calories</div></div>
+            <div class="session-stat"><div class="ss-val" id="ss-xp">0</div><div class="ss-lbl">XP Earned</div></div>
+          </div>
+          <canvas id="session-chart" height="130"></canvas>
+        </div>
+
+        <!-- Exercise Library -->
+        <div class="glass-card exercise-lib-card">
+          <div class="card-head"><h3><i class="fas fa-list"></i> Exercise Library</h3></div>
+          <div class="exercise-list" id="exercise-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== AI COACH ===== -->
+    <section id="page-ai-coach" class="page">
+      <div class="page-header">
+        <div>
+          <h1><i class="fas fa-robot"></i> AI Coach</h1>
+          <p>Powered by Gemini • Personalized fitness guidance during live matches</p>
+        </div>
+      </div>
+      <div class="coach-grid">
+        <div class="glass-card coach-chat-card">
+          <div class="card-head">
+            <div class="coach-avatar-wrap">
+              <div class="coach-avatar"><i class="fas fa-robot"></i></div>
+              <div><div class="coach-name">Coach Gemini</div><div class="coach-status"><span class="pulse-dot"></span>Online</div></div>
+            </div>
+          </div>
+          <div id="chat-messages" class="chat-messages">
+            <div class="msg bot-msg">
+              <div class="msg-bubble">Hey champion! 🏏💪 I'm your AI Coach powered by Gemini. I'll guide your fitness journey based on what's happening in the match. Ask me anything about workouts, nutrition, or current match strategy!</div>
+              <div class="msg-time">Just now</div>
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter')sendCoachMessage()" />
+            <button class="btn-primary" onclick="sendCoachMessage()"><i class="fas fa-paper-plane"></i></button>
+          </div>
+        </div>
+        <div class="coach-side-panel">
+          <div class="glass-card">
+            <div class="card-head"><h3><i class="fas fa-lightbulb"></i> Quick Prompts</h3></div>
+            <div class="quick-prompts" id="quick-prompts"></div>
+          </div>
+          <div class="glass-card">
+            <div class="card-head"><h3><i class="fas fa-bullseye"></i> Today's Goal</h3></div>
+            <div class="goal-display" id="todays-goal">
+              <div class="goal-icon">🎯</div>
+              <div class="goal-text">Complete 3 match challenges and maintain a 60% form accuracy</div>
+              <div class="goal-progress-wrap">
+                <div class="goal-progress-bar"><div class="goal-progress-fill" style="width:67%"></div></div>
+                <span>2/3 challenges</span>
+              </div>
+            </div>
+          </div>
+          <div class="glass-card">
+            <div class="card-head"><h3><i class="fas fa-list-check"></i> Match Workout Plan</h3></div>
+            <div id="match-workout-plan"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SQUAD ZONE ===== -->
+    <section id="page-squad" class="page">
+      <div class="page-header">
+        <div>
+          <h1><i class="fas fa-users"></i> Squad Zone</h1>
+          <p>Team challenges • Leaderboards • Group accountability</p>
+        </div>
+        <button class="btn-primary" onclick="createSquadChallenge()"><i class="fas fa-plus"></i> New Challenge</button>
+      </div>
+      <div class="squad-grid">
+        <!-- Global Leaderboard -->
+        <div class="glass-card leaderboard-card">
+          <div class="card-head">
+            <h3><i class="fas fa-globe"></i> Global Leaderboard</h3>
+            <div class="lb-tabs">
+              <button class="lb-tab active" onclick="switchLbTab('fitfan', this)">FitFan Score</button>
+              <button class="lb-tab" onclick="switchLbTab('fitness', this)">Fitness</button>
+              <button class="lb-tab" onclick="switchLbTab('fan', this)">Fan Points</button>
+            </div>
+          </div>
+          <div id="global-leaderboard"></div>
+        </div>
+
+        <!-- Active Squad Challenges -->
+        <div class="glass-card">
+          <div class="card-head"><h3><i class="fas fa-handshake-angle"></i> Squad Challenges</h3></div>
+          <div id="squad-challenges-list"></div>
+        </div>
+
+        <!-- My Squad -->
+        <div class="glass-card">
+          <div class="card-head">
+            <h3><i class="fas fa-shield-halved"></i> My Squad — Thunder Bolts</h3>
+            <span class="squad-rank-badge">#2 Overall</span>
+          </div>
+          <div id="my-squad-list"></div>
+        </div>
+
+        <!-- Challenge Invite -->
+        <div class="glass-card invite-card">
+          <div class="invite-emoji">⚡</div>
+          <h3>Challenge a Friend!</h3>
+          <p>Send a fitness challenge tied to tonight's match events</p>
+          <input type="text" placeholder="Friend's username..." id="friend-input" />
+          <button class="btn-primary full-w mt-1" onclick="sendChallenge()"><i class="fas fa-paper-plane"></i> Send Challenge</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PROFILE ===== -->
+    <section id="page-profile" class="page">
+      <div class="page-header"><h1><i class="fas fa-user-circle"></i> My Profile</h1></div>
+      <div class="profile-grid">
+        <div class="glass-card profile-hero-card">
+          <div class="profile-hero">
+            <div class="profile-avatar-big">R</div>
+            <div class="profile-info">
+              <h2>Rishi</h2>
+              <div class="level-badge-big">Level 12 FitFan</div>
+              <div class="profile-tagline">🏏 MI Fan • 💪 Fitness Warrior</div>
+            </div>
+          </div>
+          <div class="xp-progress-wrap">
+            <div class="xp-labels"><span>2,450 XP</span><span>3,000 XP (Level 13)</span></div>
+            <div class="xp-bar"><div class="xp-fill" style="width:81%"></div></div>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="card-head"><h3><i class="fas fa-medal"></i> Achievements</h3></div>
+          <div id="achievements-grid" class="achievements-grid"></div>
+        </div>
+        <div class="glass-card">
+          <div class="card-head"><h3><i class="fas fa-route"></i> Fitness Journey</h3></div>
+          <canvas id="profile-chart" height="140"></canvas>
+        </div>
+        <div class="glass-card">
+          <div class="card-head"><h3><i class="fas fa-history"></i> Recent Activity</h3></div>
+          <div id="activity-feed"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Scripts -->
+<script src="js/config.js"></script>
+<script src="js/match-engine.js"></script>
+<script src="js/stadium3d.js"></script>
+<script src="js/pose-tracker.js"></script>
+<script src="js/ai-engine.js"></script>
+<script src="js/challenges.js"></script>
+<script src="js/squad.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
