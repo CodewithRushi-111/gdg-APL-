@@ -4,6 +4,7 @@
   "description": "Backend Express & WebSocket server for CricFit Arena",
   "main": "server.js",
   "scripts": {
+    "build": "echo 'Static build complete'",
     "start": "node --env-file=.env server.js",
     "dev": "node --env-file=.env server.js"
   },
