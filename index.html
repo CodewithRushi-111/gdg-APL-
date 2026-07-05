@@ -352,6 +352,45 @@
             <button class="btn-primary" id="start-cam-btn" onclick="fitTracker.startCamera()"><i class="fas fa-video"></i> Start Camera</button>
             <button class="btn-secondary" id="stop-cam-btn" onclick="fitTracker.stopCamera()" style="display:none"><i class="fas fa-stop"></i> Stop</button>
             <button class="btn-accent" onclick="fitTracker.resetReps()"><i class="fas fa-rotate-left"></i> Reset</button>
+            <button class="btn-secondary" onclick="fitTracker.toggleMLPanel()"><i class="fas fa-brain"></i> ML Trainer</button>
+          </div>
+
+          <!-- ML Classifier Panel -->
+          <div id="ml-training-panel" class="ml-training-panel" style="display:none; margin-top: 1rem; border-top: 1px solid var(--card-border); padding-top: 1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
+              <h4 style="margin:0"><i class="fas fa-brain"></i> Interactive ML Trainer</h4>
+              <span id="ml-status" style="font-size:0.75rem; background:rgba(255,255,255,0.05); padding:0.2rem 0.5rem; border-radius:4px">No Data</span>
+            </div>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.75rem">
+              Perform the pose in front of the camera, then click & hold the buttons below to record training frames.
+            </p>
+            <div class="training-btn-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.75rem">
+              <button class="btn-secondary btn-sm" id="btn-train-pushup" 
+                onmousedown="fitTracker.startRecording('pushup')" onmouseup="fitTracker.stopRecording()" onmouseleave="fitTracker.stopRecording()"
+                ontouchstart="event.preventDefault(); fitTracker.startRecording('pushup')" ontouchend="fitTracker.stopRecording()"
+                style="padding: 0.4rem; font-size: 0.75rem;">
+                Train Real Pushup (<span id="count-pushup">0</span>)
+              </button>
+              <button class="btn-secondary btn-sm" id="btn-train-standing" 
+                onmousedown="fitTracker.startRecording('standing')" onmouseup="fitTracker.stopRecording()" onmouseleave="fitTracker.stopRecording()"
+                ontouchstart="event.preventDefault(); fitTracker.startRecording('standing')" ontouchend="fitTracker.stopRecording()"
+                style="padding: 0.4rem; font-size: 0.75rem;">
+                Train Standing/Mimic (<span id="count-standing">0</span>)
+              </button>
+              <button class="btn-secondary btn-sm" id="btn-train-idle" 
+                onmousedown="fitTracker.startRecording('idle')" onmouseup="fitTracker.stopRecording()" onmouseleave="fitTracker.stopRecording()"
+                ontouchstart="event.preventDefault(); fitTracker.startRecording('idle')" ontouchend="fitTracker.stopRecording()"
+                style="padding: 0.4rem; font-size: 0.75rem;">
+                Train Idle/Relaxed (<span id="count-idle">0</span>)
+              </button>
+              <button class="btn-accent btn-sm" onclick="fitTracker.resetTraining()"
+                style="padding: 0.4rem; font-size: 0.75rem;">
+                Reset ML Data
+              </button>
+            </div>
+            <div id="ml-prediction-badge" style="font-size:0.85rem; font-weight:700; text-align:center; padding:0.4rem; border-radius:6px; margin-top: 0.5rem; display:none">
+              Predicting: -
+            </div>
           </div>
           <div class="pose-legend">
             <div class="legend-item"><div class="legend-dot" style="background:#06b6d4;color:#06b6d4"></div>Arms</div>

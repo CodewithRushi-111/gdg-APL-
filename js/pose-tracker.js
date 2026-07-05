@@ -18,6 +18,10 @@ const fitTracker = {
   mpCamera: null,
   useRealAI: false,
 
+  // ML Pose Classifier
+  recordingLabel: null,
+  trainingData: [],
+
   init() {
     this.video = document.getElementById('pose-video');
     this.canvas = document.getElementById('pose-canvas');
@@ -34,6 +38,7 @@ const fitTracker = {
     }
     
     this.renderExerciseLibrary();
+    this.loadTrainingData();
   },
 
   setExercise(ex) {
@@ -63,7 +68,9 @@ const fitTracker = {
     if (ssCal) ssCal.innerText = Math.round(this.calories);
 
     // Update global state
-    state.activeChallenge.currentReps = this.reps;
+    if (state && state.activeChallenge) {
+      state.activeChallenge.currentReps = this.reps;
+    }
     if (typeof ChallengeManager !== 'undefined') {
       ChallengeManager.updateChallengeProgress();
     }
@@ -187,15 +194,40 @@ const fitTracker = {
 
     const landmarks = results.poseLandmarks;
     
-    // Landmark references:
-    // Left Shoulder: 11, Right Shoulder: 12
-    // Left Elbow: 13, Right Elbow: 14
-    // Left Wrist: 15, Right Wrist: 16
-    // Left Hip: 23, Right Hip: 24
-    // Left Knee: 25, Right Knee: 26
-    // Left Ankle: 27, Right Ankle: 28
+    // ML Feature Recording & Real-time Classification
+    let currentPrediction = null;
+    try {
+      const features = this.getNormalizedPoseFeatures(landmarks);
+      
+      if (this.recordingLabel) {
+        this.trainingData.push({ features, label: this.recordingLabel });
+        this.updateTrainingCounts();
+      }
 
-    // skeleton drawing moved below angle calc
+      if (this.trainingData.length > 0) {
+        currentPrediction = this.classifyPose(features);
+        const badge = document.getElementById('ml-prediction-badge');
+        if (badge) {
+          badge.style.display = 'block';
+          badge.innerText = `Predicting: ${currentPrediction.toUpperCase()}`;
+          if (currentPrediction === 'pushup') {
+            badge.style.color = '#10b981';
+            badge.style.background = 'rgba(16, 185, 129, 0.1)';
+            badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+          } else if (currentPrediction === 'standing') {
+            badge.style.color = '#f97316';
+            badge.style.background = 'rgba(249, 115, 22, 0.1)';
+            badge.style.borderColor = 'rgba(249, 115, 22, 0.3)';
+          } else {
+            badge.style.color = '#9ca3af';
+            badge.style.background = 'rgba(255,255,255,0.05)';
+            badge.style.borderColor = 'rgba(255,255,255,0.1)';
+          }
+        }
+      }
+    } catch(e) {
+      console.warn("ML Classifier prediction failed:", e);
+    }
 
     // Calculate angles depending on selected exercise
     let currentAngle = 180;
@@ -240,7 +272,7 @@ const fitTracker = {
     try { this.drawRealSkeleton(landmarks); } catch(e) { console.warn('Skeleton draw error:', e); }
 
     // Track reps based on state transitions
-    this.trackReps(currentAngle, formWarning);
+    this.trackReps(currentAngle, formWarning, currentPrediction);
   },
 
   calculateAngle(A, B, C) {
@@ -253,9 +285,29 @@ const fitTracker = {
     return angle;
   },
 
-  trackReps(angle, formWarning) {
+  trackReps(angle, formWarning, prediction) {
     const phaseTag = document.getElementById('phase-tag');
     const formTag = document.getElementById('form-tag');
+
+    // Anti-Cheating validation if training data is present
+    if (this.exercise === 'pushup' && this.trainingData.length > 0) {
+      if (prediction && prediction !== 'pushup') {
+        if (formTag) {
+          formTag.innerHTML = `<i class="fas fa-circle-xmark"></i> Standing/Mimic Detected!`;
+          formTag.className = 'form-tag danger';
+        }
+        if (phaseTag) {
+          phaseTag.innerText = "Get down on the floor!";
+        }
+        return; // BLOCK rep counting!
+      } else {
+        // Clear warning tag if it was showing Mimic Detected
+        if (formTag && formTag.classList.contains('danger')) {
+          formTag.innerHTML = `<i class="fas fa-circle-check"></i> Position Correct`;
+          formTag.className = 'form-tag';
+        }
+      }
+    }
 
     let downThreshold = 95;
     let upThreshold = 160;
@@ -641,5 +693,137 @@ const fitTracker = {
         </div>
       </div>
     `).join('');
+  },
+
+  toggleMLPanel() {
+    const panel = document.getElementById('ml-training-panel');
+    if (panel) {
+      const isVisible = panel.style.display !== 'none';
+      panel.style.display = isVisible ? 'none' : 'block';
+    }
+  },
+
+  startRecording(label) {
+    if (!this.active || !this.useRealAI) {
+      alert("Please start the camera first to train the ML model!");
+      return;
+    }
+    this.recordingLabel = label;
+    const status = document.getElementById('ml-status');
+    if (status) status.innerText = `Recording ${label}...`;
+  },
+
+  stopRecording() {
+    this.recordingLabel = null;
+    this.saveTrainingData();
+    this.updateTrainingCounts();
+    const status = document.getElementById('ml-status');
+    if (status) {
+      status.innerText = this.trainingData.length > 0 ? `${this.trainingData.length} samples` : 'No Data';
+    }
+  },
+
+  resetTraining() {
+    if (confirm("Are you sure you want to clear all ML training data?")) {
+      this.trainingData = [];
+      this.saveTrainingData();
+      this.updateTrainingCounts();
+      const status = document.getElementById('ml-status');
+      if (status) status.innerText = 'No Data';
+      const badge = document.getElementById('ml-prediction-badge');
+      if (badge) badge.style.display = 'none';
+    }
+  },
+
+  updateTrainingCounts() {
+    const counts = { pushup: 0, standing: 0, idle: 0 };
+    this.trainingData.forEach(item => {
+      if (counts[item.label] !== undefined) {
+        counts[item.label]++;
+      }
+    });
+
+    const cp = document.getElementById('count-pushup');
+    const cs = document.getElementById('count-standing');
+    const ci = document.getElementById('count-idle');
+    if (cp) cp.innerText = counts.pushup;
+    if (cs) cs.innerText = counts.standing;
+    if (ci) ci.innerText = counts.idle;
+
+    const status = document.getElementById('ml-status');
+    if (status) {
+      status.innerText = this.trainingData.length > 0 ? `${this.trainingData.length} samples` : 'No Data';
+    }
+  },
+
+  saveTrainingData() {
+    localStorage.setItem('cricfit_training_data', JSON.stringify(this.trainingData));
+  },
+
+  loadTrainingData() {
+    const data = localStorage.getItem('cricfit_training_data');
+    if (data) {
+      try {
+        this.trainingData = JSON.parse(data);
+        // Wait a tick for DOM to be ready
+        setTimeout(() => this.updateTrainingCounts(), 100);
+        console.log(`Loaded ${this.trainingData.length} training examples from LocalStorage.`);
+      } catch (e) {
+        console.error("Error loading training data", e);
+      }
+    }
+  },
+
+  getNormalizedPoseFeatures(landmarks) {
+    const hipL = landmarks[23];
+    const hipR = landmarks[24];
+    const hipCenterX = (hipL.x + hipR.x) / 2;
+    const hipCenterY = (hipL.y + hipR.y) / 2;
+
+    const shL = landmarks[11];
+    const shR = landmarks[12];
+    const shCenterX = (shL.x + shR.x) / 2;
+    const shCenterY = (shL.y + shR.y) / 2;
+    const torsoHeight = Math.sqrt(Math.pow(shCenterX - hipCenterX, 2) + Math.pow(shCenterY - hipCenterY, 2)) || 0.1;
+
+    const keyJoints = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+    const features = [];
+    keyJoints.forEach(idx => {
+      const lm = landmarks[idx];
+      features.push((lm.x - hipCenterX) / torsoHeight);
+      features.push((lm.y - hipCenterY) / torsoHeight);
+    });
+    return features;
+  },
+
+  classifyPose(features) {
+    if (this.trainingData.length === 0) return null;
+
+    const k = 5;
+    const distances = this.trainingData.map(example => {
+      let sumSq = 0;
+      for (let i = 0; i < features.length; i++) {
+        sumSq += Math.pow(features[i] - example.features[i], 2);
+      }
+      return { distance: Math.sqrt(sumSq), label: example.label };
+    });
+
+    distances.sort((a, b) => a.distance - b.distance);
+    const kNeighbors = distances.slice(0, Math.min(k, distances.length));
+
+    const votes = {};
+    kNeighbors.forEach(n => {
+      votes[n.label] = (votes[n.label] || 0) + 1;
+    });
+
+    let bestLabel = null;
+    let maxVotes = -1;
+    for (const label in votes) {
+      if (votes[label] > maxVotes) {
+        maxVotes = votes[label];
+        bestLabel = label;
+      }
+    }
+    return bestLabel;
   }
 };

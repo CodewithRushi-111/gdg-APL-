@@ -27,10 +27,10 @@ const stadium3D = {
     renderer.shadowMap.enabled = true;
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0x223344, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
     mainLight.position.set(20, 60, 20);
     scene.add(mainLight);
 
@@ -40,7 +40,7 @@ const stadium3D = {
       [-40, 30, 40], [40, 30, 40]
     ];
     positions.forEach(pos => {
-      const light = new THREE.SpotLight(0x00ffff, 2, 120, Math.PI/4, 0.5, 1);
+      const light = new THREE.SpotLight(0x00ffff, 12, 120, Math.PI/4, 0.5, 1);
       light.position.set(pos[0], pos[1], pos[2]);
       light.target.position.set(0, 0, 0);
       scene.add(light);
@@ -52,6 +52,13 @@ const stadium3D = {
       const tower = new THREE.Mesh(towerGeo, towerMat);
       tower.position.set(pos[0], 15, pos[2]);
       scene.add(tower);
+
+      // Glowing light bulb at tower top
+      const bulbGeo = new THREE.SphereGeometry(1.5, 16, 16);
+      const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+      bulb.position.set(pos[0], 30.5, pos[2]);
+      scene.add(bulb);
     });
 
     // Cricket Pitch (Turf)

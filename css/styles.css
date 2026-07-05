@@ -1251,7 +1251,7 @@ button {
   .nav-item span {
     display: none;
   }
-  .dash-grid, .match-grid, .fit-grid, .coach-grid, .squad-grid {
+  .dash-grid, .match-grid, .fit-grid, .coach-grid, .squad-grid, .profile-grid {
     grid-template-columns: 1fr;
   }
   .span-2 {
